@@ -91,7 +91,7 @@ class Cosmo:
         shuffle(self.shell)
         flak = zip(self.shell, self.atacks)
         print("Assemble alien armies.", flak)
-        [Atacker(self.html, self, face, FACES.index(face), route)
+        [Attacker(self.html, self, face, FACES.index(face), route)
          for color, (face, route) in enumerate(flak[:2])]
         [Defender(self.html, self, face, FACES.index(face), place[0], place[1])
          for color, (face, place) in enumerate(zip(FACES, ships))]
@@ -267,14 +267,11 @@ class Debris:
         self.cosmo.div <= self.div
 
 
-class Atacker:
+class Attacker:
     """Flak defenses from invaded planet orbit. :ref:`atacker`
     """
     def __init__(self, gui, cosmo, face, color, route):
         """Init Atacker. """
-        def over(ev):
-            print("Init Atacker over. ", self, ev.target.Id, color, self._id)
-            self.cosmo.try_me(color, self)
         self.html, self.cosmo, self.face, self.color = gui, cosmo, face, color
         #print("Inicializa Debris. ", face, color, route)
         self.kind, self.l, self.t = self.__class__.__name__, -100, 0
@@ -286,9 +283,13 @@ class Atacker:
             ))
         self._id = "%s_%d" % (self.kind, color)
         self.div = self.html.DIV(Id=self._id, style=estilo)
-        self.div.onmouseover = over
+        self.div.onmouseover = self.over
         self.div.onanimationend = self.hit
         self.cosmo.div <= self.div
+
+    def over(self, ev):
+        print("Init Atacker over. ", self, ev.target.Id, self.color, self._id)
+        self.cosmo.try_me(self.color, self)
 
     def hit(self, ev):
         self.cosmo.defend_planet(self._id, self)
