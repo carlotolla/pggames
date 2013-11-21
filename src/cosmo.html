@@ -1,0 +1,71 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN"><!--
+
+############################################################
+Cosmo Invaders - A multiplayer invasion battle
+############################################################
+
+:Author: *Carlo E. T. Oliveira*
+:Contact: carlo@nce.ufrj.br
+:Date: 2013/11/20
+:Status: This is a "work in progress"
+:Revision: 0.1.0
+:Home: `Labase <http://labase.selfip.org/>`__
+:Copyright: 2013, `GPL <http://is.gd/3Udt>`__.
+-->
+<html>
+    <head>
+        <meta charset="UTF-8">
+        <title>Cosmo invaders</title>
+        <meta http-equiv="content-type" content="application/xml;charset=utf-8" />
+        <script type="text/javascript" src="https://dl.dropboxusercontent.com/u/1751704/labase/lib/brython.js"></script>
+        <script type="text/python" src="invader.py">
+        </script>
+        <style>
+            @keyframes alt0{from {top:650px;left:650px;}to {top:300px;left:950px;}}
+            @keyframes alt1{from {top:650px;left:600px;}to {top:350px;left:950px;}}
+            @keyframes alt2{from {top:650px;left:500px;}to {top:400px;left:950px;}}
+            @keyframes alt3{from {top:650px;left:400px;}to {top:450px;left:950px;}}
+            @keyframes alt4{from {top:650px;left:300px;}to {top:500px;left:950px;}}
+            @keyframes alt5{from {top:650px;left:300px;}to {top:450px;left:950px;}}
+            @keyframes alt6{from {top:650px;left:400px;}to {top:500px;left:950px;}}
+            @keyframes alt7{from {top:650px;left:500px;}to {top:300px;left:950px;}}
+            @keyframes alt8{from {top:650px;left:600px;}to {top:350px;left:950px;}}
+            @keyframes alt9{from {top:650px;left:650px;}to {top:400px;left:950px;}}
+            
+            @keyframes atk0{from {top:050px;left:10px;}to {top:400px;left:680px;}}
+            @keyframes atk1{from {top:150px;left:10px;}to {top:390px;left:680px;}}
+            @keyframes atk2{from {top:200px;left:10px;}to {top:330px;left:680px;}}
+            @keyframes atk3{from {top:250px;left:10px;}to {top:300px;left:680px;}}
+            @keyframes atk4{from {top:300px;left:10px;}to {top:290px;left:680px;}}
+            @keyframes atk5{from {top:350px;left:10px;}to {top:230px;left:680px;}}
+            @keyframes atk6{from {top:400px;left:10px;}to {top:200px;left:680px;}}
+            @keyframes atk7{from {top:450px;left:10px;}to {top:190px;left:680px;}}
+            @keyframes atk8{from {top:500px;left:10px;}to {top:130px;left:680px;}}
+            @keyframes atk9{from {top:550px;left:10px;}to {top:100px;left:680px;}}
+            @keyframes atk10{from {top:600px;left:10px;}to {top:90px;left:680px;}}
+            @keyframes atk11{from {top:650px;left:10px;}to {top:30px;left:680px;}}
+
+        </style>
+        <script type="text/python">
+            from local_storage import storage
+            import json
+            import svg
+            import html
+            import time
+            class Brython:
+                DOC, SVG, HTML, AJAX, WIN = doc, svg, html, ajax, win
+                STORAGE, JSON, TIME, WSK = storage, json, time, websocket
+                def conf(self, question):
+                    return confirm(question)
+                def aler(self, question):
+                    return alert(question)
+                def prom(self, question, text):
+                    return prompt(question, text)
+            main(Brython)
+        </script>
+    </head>
+    <body onLoad="brython(1)">
+        <div id="main">
+        </div>
+    </body>
+</html>
