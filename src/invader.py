@@ -59,6 +59,17 @@ class Cosmo:
                 print('CHANNEL_ in data', self.sid, data)
                 self.event[data['CHANNEL_']](**data)
             print('ev.data', ev.data)
+
+        def con_gamepad(e):
+            self.gamepad[e.gamepad.index] = e.gamepad
+            gui.WIN.mozRequestAnimationFrame(updateStatus)
+
+        def updateStatus(e=0):
+            self.space.div.text = "%d  %d - %d  %d" % (
+                self.gamepad[0].axes[0]*1000, self.gamepad[0].axes[1]*1000,
+                self.gamepad[0].axes[3]*1000, self.gamepad[0].axes[4]*1000)
+            gui.WIN.mozRequestAnimationFrame(updateStatus)
+
         self.event = self.assets = {}
         self.actor = self
         self.sid = ''
@@ -69,19 +80,26 @@ class Cosmo:
         #self.event = dict(move=self.move_heroi, cria=self.cria_heroi, pega=self.pega_item)
         self.doc = gui.DOC
         self.html = gui.HTML
+        self.vg = gui.SVG
         self.gui = gui
+        self.gamepad = {}
         #self.pusher = gui.WSK('ws://achex.ca:4010')
         #self.pusher.on_open = conecta
         #self.pusher.on_message = recebe
 
         self.div = self.doc['main']
+        self.svg = gui.SVG.svg(width=1000, height=HEIGHT)
+        #self.div <= self.svg
+
         self.shell = [face for kind in PIECE[:-1] for face in kind]
         self.atacks = ATACKS*2
         self.create_assets()
+        gui.WIN.addEventListener("gamepadconnected", con_gamepad)
 
     def create_assets(self):
         """Assemble alien armies."""
         self.space = Space(self.html, self)
+        self.space.div <= self.svg
         #Defender(self.html, self, PIECE[0][0])
         ships = SHIPS[:]
         shuffle(ships)
@@ -91,8 +109,10 @@ class Cosmo:
         shuffle(self.atacks)
         shuffle(self.shell)
         flak = zip(self.shell, self.atacks)
-        [Attacker(self.html, self, face, FACES.index(face), route)
+        [Attacker(self.vg, self, face, FACES.index(face), route)
          for color, (face, route) in enumerate(flak[:2])]
+        #[Attacker(self.html, self, face, FACES.index(face), route)
+        # for color, (face, route) in enumerate(flak[:2])]
         [Defender(self.html, self, face, FACES.index(face), place[0], place[1])
          for color, (face, place) in enumerate(zip(FACES, ships))]
         print("Assemble alien armies.", PIECE)
@@ -100,6 +120,8 @@ class Cosmo:
          for color, face in enumerate(PIECE[:-1])]
         #[Debris(self.html, self, face, color, route, kind) for kind in (20, 30, 40)
         # for color, (face, route) in enumerate(debris)]
+        [Debris(self.vg, self, face, color, route, kind) for kind in (20, 30, 40)
+         for color, (face, route) in enumerate(debris)]
 
         return self
 
@@ -205,7 +227,7 @@ class Lander:
         self.cosmo.div <= self.div
 
 
-class Debris:
+class DivDebris:
     """Remains of wasted atackers. :ref:`debris`
     """
     def __init__(self, gui, cosmo, face, color, route, kind):
@@ -217,15 +239,37 @@ class Debris:
         estilo = dict(
             width=kind, height=kind, background='url(%s) 100%% 100%% / cover' % face,
             Float="left", position="absolute", left=self.l, top=self.t, opacity=0.6,
-            _webkit_animation=animate, animation=animate)
+            WebkitAnimation=animate, animation=animate)
             #animation='%s 5s linear %ds infinite alternate %s 5s linear %ds infinite alternate' % (
             #    route[0], randint(1, 6), route[1], randint(1, 6)
             #))
         self.div = self.html.DIV(Id="%s_%d" % (self.kind, color), style=estilo)
+        self.div.style.webkitAnimationName = route
+        self.div.style.webkitAnimationDuration = "%fs" % random()*5+5
         self.cosmo.div <= self.div
 
 
-class Attacker:
+class Debris:
+    """Remains of wasted atackers. :ref:`debris`
+    """
+    def __init__(self, gui, cosmo, face, color, route, kind):
+        """Init Debris. """
+        self.vg, self.cosmo, self.face = gui, cosmo, face
+        #print("Inicializa Debris. ", face, color, route)
+        self.kind, self.l, self.t = self.__class__.__name__, ORBIT, ORBIT
+        animatex = self.vg.animateTransform(
+            attributeType="xml", attributeName="transform", begin="%dms" % randint(0, 3000),
+            type="translate", to="300, %d" % (randint(-150, -350)),
+            dur="%dms" % randint(6000, 12000), repeatCount="indefinite")
+        animatex.setAttribute("from", "%d, 20" % (randint(-50, -400)))
+        self.div = self.vg.image(
+            Id="%s_%d" % (self.kind, color), href=face, x=self.l,
+            y=self.t, width=kind, height=kind, opacity=0.6)
+        self.div <= animatex
+        self.cosmo.svg <= self.div
+
+
+class DivAttacker:
     """Flak defenses from invaded planet orbit. :ref:`atacker`
     """
     def __init__(self, gui, cosmo, face, color, route):
@@ -244,19 +288,54 @@ class Attacker:
         self.div.onanimationend = self.hit
         self.cosmo.div <= self.div
 
+
+class Attacker:
+    """Flak defenses from invaded planet orbit. :ref:`atacker`
+    """
+    def __init__(self, gui, cosmo, face, color, route):
+        """Init Atacker. """
+        self.vg, self.cosmo, self.face, self.color = gui, cosmo, face, color
+        #print("Inicializa Debris. ", face, color, route)
+        self.kind, self.l, self.t = self.__class__.__name__, -100, 0
+        self.transform = self.vg.animateTransform(attributeType="xml", attributeName="transform",
+                                                  begin="%dms" % randint(2000, 4000), type="translate",
+                                                  to="800, %d" % (randint(0, 400)), dur="%dms" % randint(6000, 12000),
+                                                  repeatCount="1")
+        self.transform.setAttribute("from", "20, %d" % (randint(0, 700)))
+        self._id = "%s_%d" % (self.kind, color)
+        self.div = self.vg.image(
+            id=self._id, href=face, x=self.l,
+            y=self.t, width=WIDTH, height=WIDTH, opacity=0.6)
+        self.div <= self.transform
+        self.cosmo.svg <= self.div
+        self.div.onmouseover = self.over
+        self.transform.onend = self.hit
+        self.div.onend = self.hit
+
     def over(self, ev):
         print("Init Atacker over. ", self, ev.target.Id, self.color, self._id)
         self.cosmo.try_me(self.color, self)
 
     def hit(self, ev):
         self.cosmo.defend_planet(self._id, self)
-        #print("Init Atacker hit. ", self, ev.target.Id)
+        print("Init Atacker hit. ", self, ev.target.Id)
 
     def fail(self, ev):
         #print("Init Atacker fail. ", self, ev.target.Id)
         self.cosmo.trigger_flak(self._id, self)
         self.div.style.display = 'none'
         self.div.onanimationend = self.hit
+
+    def div_trigger_flak(self, face, route):
+        """Localiza Heroi. """
+        self.color = FACES.index(face)
+        self.transform.begin = "%dms" % randint(2000, 4000)
+        self.transform.dur = "%dms" % randint(6000, 12000)
+        self.transform.to = "800, %d" % (randint(0, 400))
+        self.transform.setAttribute("from", "20, %d" % (randint(0, 700)))
+        self.div.href = face
+        self.transform.onend = self.hit
+        self.div.onend = self.hit
 
     def trigger_flak(self, face, route):
         """Localiza Heroi. """
@@ -280,13 +359,13 @@ class Space:
     """The last frontier, scenary wher battles are fought. :ref:`space`
     """
 
-    def __init__(self, gui, cosmo, nome='Space'):
+    def __init__(self, html, cosmo, nome='Space'):
         """Inicializa Camara. """
         def click(ev):
             self.cosmo.acquire(0, self.cosmo)
-        self.html, self.cosmo, self.nome = gui, cosmo, nome
-        estilo = dict(width=1000, height=HEIGHT, background='url(%s) 100%% 100%% / cover' % COSMO)
-        self.div = self.html.DIV(nome, Id=nome, style=estilo)
+        self.html, self.cosmo, self.nome = html, cosmo, nome
+        estilo = dict(width=1000, height=HEIGHT)  # , background='url(%s) 100%% 100%% / cover' % COSMO)
+        self.div = self.html.DIV(id=nome, style=estilo)
 
         cosmo.div <= self.div
         self.div.onmousemove = self.drag
