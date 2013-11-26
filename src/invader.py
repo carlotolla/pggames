@@ -13,7 +13,6 @@ Cosmo Conquerors - A multiplayer invasion battle
 Cosmo Conquerors are a divided race conquering anothers race planet.
 """
 ATACK_PATH = "M-1000 %d L550 %d"
-HEIGHT = 400
 WIDTH = 40
 __version__ = '0.1.0'
 
@@ -73,7 +72,8 @@ class Cosmo:
         self.doc = gui.DOC
         self.html = gui.HTML
         self.vg = gui.SVG
-        self.gui = gui
+        self.br_gui = gui
+        self.win = gui.WIN
         self.gamepad = {}
         #self.pusher = gui.WSK('ws://achex.ca:4010')
         #self.pusher.on_open = conecta
@@ -106,6 +106,7 @@ class Cosmo:
         self.defenders = [Defender(
             self.html, self, face, FACES.index(face), place[0], place[1])
             for color, (face, place) in enumerate(zip(FACES, ships))]
+        Gamepad(self, self.win, self.defenders)
         print("Assemble alien armies.", PIECE)
         [Lander(self.html, self, face[color % 3], HEIGHT + 2*WIDTH*color)
          for color, face in enumerate(PIECE[:-1])]
@@ -113,20 +114,6 @@ class Cosmo:
          for color, (face, route) in enumerate(debris)]
 
         return self
-
-    def init_gamepad(self):
-        """handle Gamapad."""
-
-        def con_gamepad(e):
-            self.gamepad[e.gamepad.index] = e.gamepad
-            gui.WIN.mozRequestAnimationFrame(updateStatus)
-
-        def updateStatus(e=0):
-            self.space.div.text = "%d  %d - %d  %d" % (
-                self.gamepad[0].axes[0]*1000, self.gamepad[0].axes[1]*1000,
-                self.gamepad[0].axes[3]*1000, self.gamepad[0].axes[4]*1000)
-            gui.WIN.mozRequestAnimationFrame(updateStatus)
-        gui.WIN.addEventListener("gamepadconnected", con_gamepad)
 
     def try_me(self, color, flak):
         self.defender[color].intercept(flak)
@@ -169,6 +156,78 @@ class Cosmo:
         if sID == self.sid:
             self.send(channel='pega', item=item, nome=nome)
 
+STEP = 30
+DEAD = 2
+
+
+class Gamepad:
+    """Controls Gamepad. :ref:`gamepad`
+    """
+    def __init__(self, cosmo, win, defenders):
+        """Inicializa Gamepad. """
+
+        def nop(e=0):
+            self.go()
+            self.go = lambda e=0: None
+            pass
+
+        def action(e=0):
+            self.defender.action()
+
+        def release(e=0):
+            self.defender.release()
+
+        def con_gamepad(e):
+            self.gamepad[e.gamepad.index] = e.gamepad
+            self.pad1x, self.pad1y, self.pad2x,  self.pad2y = (
+                self.gamepad[0].axes[0]*STEP, self.gamepad[0].axes[1]*STEP,
+                self.gamepad[0].axes[3]*STEP, self.gamepad[0].axes[4]*STEP)
+            self.win.mozRequestAnimationFrame(updateStatus)
+            print("Inicializa con_gamepad", self.gamepad.keys())
+
+        def updateStatus(e=0):
+            #self.space.div.text = "%d  %d - %d  %d" % (
+            pad1x, pad1y, pad2x, pad2y = (
+                self.gamepad[0].axes[0]*STEP - self.pad1x, self.gamepad[0].axes[1]*STEP - self.pad1y,
+                self.gamepad[0].axes[3]*STEP - self.pad2x, self.gamepad[0].axes[4]*STEP - self.pad2y)
+            gamebutton, gamepadbuttons = self.gamebutton, self.gamepad[0].buttons
+            [gamebutton[i][button]() for i, button in enumerate(gamepadbuttons)]
+            #self.cosmo.space.div.text = "Inicializa updateStatus %d %d %d %d self %d %d %d %d" % (
+                #pad1x, pad1y, pad2x, pad2y, self.pad1x, self.pad1y, self.pad2x, self.pad2y)
+            #if abs(pad1x + pad2x) < STEP/4 or abs(pad1y + pad2y) < STEP/4:
+            #    self.win.mozRequestAnimationFrame(updateStatus)
+            #    return
+            self.clientX = (self.clientX + pad1x // DEAD + pad2x // DEAD) % HEIGHT
+            self.clientY = (self.clientY + pad1y // DEAD + pad2y // DEAD) % HEIGHT
+            gx, gy, defend = self.clientX, self.clientY, self.defenders
+            ranges = [(gx - int(a.div.left)) ** 2 + (gy - int(a.div.top)) ** 2
+                      for a in defend]
+            #print("Inicializa updateStatus", [pad1x, pad1y, pad2x, pad2y], self.gridx, self.gridy, ranges)
+            #self.cosmo.space.div.text = [self.gridx, self.gridy]
+            self.div.x, self.div.y = self.clientX, self.clientY
+            defender_range = min(ranges)
+            self.defender.div.style.opacity = 0.6
+            self.defender.mover(self)
+            self.defender = self.defenders[ranges.index(defender_range)]
+            self.defender.div.style.opacity = 1
+            #self.cosmo.space.div.text = [self.gridx, self.gridy, ranges.index(defender_range)]
+            #print("Inicializa updateStatus", [self.gridx, self.gridy, defender_range] + ranges)
+            self.win.mozRequestAnimationFrame(updateStatus)
+        self.cosmo, self.win, self.defenders = cosmo, win, defenders
+        self.go = lambda e=0: None
+        button_mapper = {'0': {0: nop, 1: nop}, '1': {0: nop, 1: action}, '2': {0: nop, 1: release}}
+        self.gamepad = {}
+        self.clientX = self.clientY = 0
+        self.gamebutton = [button_mapper[mapping] for mapping in '11221100022000']
+        self.defender = self.defenders[0]
+        self.clientX = self.clientY = 0
+        self.div = self.cosmo.vg.image(
+            id="highlight", href=PIECESTR % (1, 1, "gold"), x=0,
+            y=0, width=WIDTH, height=WIDTH, opacity=0.2)
+        self.cosmo.svg <= self.div
+        print(self.cosmo, self.win, [a.div.left for a in self.defenders])
+        self.win.addEventListener("gamepadconnected", con_gamepad)
+
 
 class Defender:
     """Repel atacks from orbital flak. :ref:`defender`
@@ -186,6 +245,8 @@ class Defender:
             self.cosmo.acquire(self.color, self)
             self.div.onclick = unclick
         self.html, self.cosmo, self.face, self.color = gui, cosmo, face, color
+        self.mover = lambda ev=0: None
+        self.action = self.doaction
         #print("Inicializa Heroi. ", face)
         self.kind, self.l, self.t = self.__class__.__name__, go(px), go(py)
         self._id = "%s%d_%d" % (self.kind, self.l, self.t)
@@ -194,6 +255,14 @@ class Defender:
         self.div = self.html.DIV(Id=self._id, style=estilo)
         self.cosmo.div <= self.div
         self.div.onclick = click
+
+    def doaction(self, ev=0):
+        self.mover = self.move
+        self.action = self.release
+
+    def release(self, ev=0):
+        self.action = self.doaction
+        self.mover = lambda ev=0: None
 
     def no_move(self, x, y):
         """Move Heroi. """
@@ -384,6 +453,7 @@ class Space:
             self.cosmo.acquire(0, self.cosmo)
         self.html, self.cosmo, self.nome = html, cosmo, nome
         estilo = dict(width=1000, height=HEIGHT, background='url(%s) 100%% 100%% / cover' % COSMO)
+        estilo = dict(width=1000, height=HEIGHT)
         self.div = self.html.DIV(id=nome, style=estilo)
 
         cosmo.div <= self.div
