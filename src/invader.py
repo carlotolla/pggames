@@ -74,6 +74,7 @@ class Cosmo:
         self.vg = gui.SVG
         self.br_gui = gui
         self.win = gui.WIN
+        self.timer = gui.TIME
         self.gamepad = {}
         #self.pusher = gui.WSK('ws://achex.ca:4010')
         #self.pusher.on_open = conecta
@@ -106,7 +107,7 @@ class Cosmo:
         self.defenders = [Defender(
             self.html, self, face, FACES.index(face), place[0], place[1])
             for color, (face, place) in enumerate(zip(FACES, ships))]
-        Gamepad(self, self.win, self.defenders)
+        Gamepad(self, self.win, self.timer, self.defenders)
         print("Assemble alien armies.", PIECE)
         [Lander(self.html, self, face[color % 3], HEIGHT + 2*WIDTH*color)
          for color, face in enumerate(PIECE[:-1])]
@@ -156,15 +157,31 @@ class Cosmo:
         if sID == self.sid:
             self.send(channel='pega', item=item, nome=nome)
 
-STEP = 30
+STEP = 60
 DEAD = 2
 
 
 class Gamepad:
     """Controls Gamepad. :ref:`gamepad`
     """
-    def __init__(self, cosmo, win, defenders):
+    def __init__(self, cosmo, win, timer, defenders):
         """Inicializa Gamepad. """
+        def choose(e=0):
+            gx, gy, defend = self.clientX, self.clientY, self.defenders
+            ranges = [(gx - int(a.div.left)) ** 2 + (gy - int(a.div.top)) ** 2
+                      for a in defend]
+            #print("Inicializa updateStatus", [pad1x, pad1y, pad2x, pad2y], self.gridx, self.gridy, ranges)
+            #self.cosmo.space.div.text = [self.gridx, self.gridy]
+            self.div.x, self.div.y = self.clientX, self.clientY
+            defender_range = min(ranges)
+            self.defender.div.style.opacity = 0.6
+            #self.defender.mover(self)
+            self.defender = self.defenders[ranges.index(defender_range)]
+            self.defender.div.style.opacity = 1
+
+        def mover(e=0):
+            self.div.style.display = 'none'
+            self.defender.move(self)
 
         def nop(e=0):
             self.go()
@@ -172,9 +189,14 @@ class Gamepad:
             pass
 
         def action(e=0):
+            self.action = release
+            self.move = mover
             self.defender.action()
 
         def release(e=0):
+            self.action = action
+            self.div.style.display = 'block'
+            self.move = choose
             self.defender.release()
 
         def con_gamepad(e):
@@ -182,11 +204,11 @@ class Gamepad:
             self.pad1x, self.pad1y, self.pad2x,  self.pad2y = (
                 self.gamepad[0].axes[0]*STEP, self.gamepad[0].axes[1]*STEP,
                 self.gamepad[0].axes[3]*STEP, self.gamepad[0].axes[4]*STEP)
-            self.win.mozRequestAnimationFrame(updateStatus)
+            #self.win.mozRequestAnimationFrame(updateStatus)
+            timer.set_interval(updateStatus, 100)
             print("Inicializa con_gamepad", self.gamepad.keys())
 
         def updateStatus(e=0):
-            #self.space.div.text = "%d  %d - %d  %d" % (
             pad1x, pad1y, pad2x, pad2y = (
                 self.gamepad[0].axes[0]*STEP - self.pad1x, self.gamepad[0].axes[1]*STEP - self.pad1y,
                 self.gamepad[0].axes[3]*STEP - self.pad2x, self.gamepad[0].axes[4]*STEP - self.pad2y)
@@ -199,23 +221,17 @@ class Gamepad:
             #    return
             self.clientX = (self.clientX + pad1x // DEAD + pad2x // DEAD) % HEIGHT
             self.clientY = (self.clientY + pad1y // DEAD + pad2y // DEAD) % HEIGHT
-            gx, gy, defend = self.clientX, self.clientY, self.defenders
-            ranges = [(gx - int(a.div.left)) ** 2 + (gy - int(a.div.top)) ** 2
-                      for a in defend]
-            #print("Inicializa updateStatus", [pad1x, pad1y, pad2x, pad2y], self.gridx, self.gridy, ranges)
-            #self.cosmo.space.div.text = [self.gridx, self.gridy]
-            self.div.x, self.div.y = self.clientX, self.clientY
-            defender_range = min(ranges)
-            self.defender.div.style.opacity = 0.6
-            self.defender.mover(self)
-            self.defender = self.defenders[ranges.index(defender_range)]
-            self.defender.div.style.opacity = 1
+            self.move()
             #self.cosmo.space.div.text = [self.gridx, self.gridy, ranges.index(defender_range)]
             #print("Inicializa updateStatus", [self.gridx, self.gridy, defender_range] + ranges)
-            self.win.mozRequestAnimationFrame(updateStatus)
+            #self.win.mozRequestAnimationFrame(updateStatus)
         self.cosmo, self.win, self.defenders = cosmo, win, defenders
         self.go = lambda e=0: None
-        button_mapper = {'0': {0: nop, 1: nop}, '1': {0: nop, 1: action}, '2': {0: nop, 1: release}}
+        self.move = choose
+        self.action = action
+
+        self.wait = self.starttime = 100000000
+        button_mapper = {'0': {0: nop, 1: nop}, '1': {0: nop, 1: self.action}, '2': {0: nop, 1: release}}
         self.gamepad = {}
         self.clientX = self.clientY = 0
         self.gamebutton = [button_mapper[mapping] for mapping in '11221100022000']
@@ -382,12 +398,12 @@ class Attacker:
         self.div.onrepeat = self.hit
 
     def over(self, ev):
-        print("Init Atacker over. ", self, ev.target.Id, self.color, self._id)
+        #print("Init Atacker over. ", self, ev.target.Id, self.color, self._id)
         self.cosmo.try_me(self.color, self)
 
     def hit(self, ev):
         self.cosmo.defend_planet(self._id, self)
-        print("Init Atacker hit. ", self, ev.target.Id, self._id)
+        #print("Init Atacker hit. ", self, ev.target.Id, self._id)
 
     def fail(self, ev):
         #print("Init Atacker fail. ", self, ev.target.Id)
@@ -407,7 +423,7 @@ class Attacker:
         #self.transform.dur = "%dms" % randint(6000, 12000)
         self.div.style.display = 'block'
 
-        print("trigger_flak. ", self, self.color, self._id)
+        #print("trigger_flak. ", self, self.color, self._id)
         '''
         #self.transform.to = "800, %d" % (randint(0, 400))
         #self.transform.setAttribute("from", "20, %d" % (randint(0, 700)))
