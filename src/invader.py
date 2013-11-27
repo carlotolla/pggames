@@ -157,13 +157,57 @@ class Cosmo:
         if sID == self.sid:
             self.send(channel='pega', item=item, nome=nome)
 
-STEP = 60
-DEAD = 2
+STEP = 100
+DEAD = 0.265
+NOP = lambda: None
 
 
 class Gamepad:
     """Controls Gamepad. :ref:`gamepad`
     """
+
+    class Button:
+        """Controls Gamepad Button. :ref:`button`
+        """
+        def __init__(self, click=NOP, up=NOP, down=NOP):
+            """Inicializa Gamepad. """
+            self.action = self.dodown
+            self.subscribers = dict()
+            self._buttonclick = self._buttonup = self._buttondown = lambda: None
+            self._down = self._dodown
+            self._click = lambda: None
+
+        def onbuttondown(self, listener):
+            self._buttondown = listener
+
+        def onbuttonup(self, listener):
+            self._buttonup = listener
+
+        def onbuttonclick(self, listener):
+            self._buttonclick = listener
+
+        def nop(self, e=0):
+            pass
+
+        def _doclick(self, e=0):
+            #print('_doclick')
+            self._click = lambda: None
+            self._buttonclick()
+            self._buttonup()
+
+        def _dodown(self, e=0):
+            #print('_dodown')
+            self._down = lambda: None
+            self._buttondown()
+
+        def dodown(self, e=0):
+            self._click = self._doclick
+            self._down()
+
+        def doup(self, e=0):
+            self._down = self._dodown
+            self._click()
+
     def __init__(self, cosmo, win, timer, defenders):
         """Inicializa Gamepad. """
         def choose(e=0):
@@ -201,7 +245,8 @@ class Gamepad:
 
         def con_gamepad(e):
             self.gamepad[e.gamepad.index] = e.gamepad
-            self.pad1x, self.pad1y, self.pad2x,  self.pad2y = (
+            self.pad1x, self.pad1y, self.pad2x,  self.pad2y = (0, 0, 0, 0)
+            a = (
                 self.gamepad[0].axes[0]*STEP, self.gamepad[0].axes[1]*STEP,
                 self.gamepad[0].axes[3]*STEP, self.gamepad[0].axes[4]*STEP)
             #self.win.mozRequestAnimationFrame(updateStatus)
@@ -214,27 +259,22 @@ class Gamepad:
                 self.gamepad[0].axes[3]*STEP - self.pad2x, self.gamepad[0].axes[4]*STEP - self.pad2y)
             gamebutton, gamepadbuttons = self.gamebutton, self.gamepad[0].buttons
             [gamebutton[i][button]() for i, button in enumerate(gamepadbuttons)]
-            #self.cosmo.space.div.text = "Inicializa updateStatus %d %d %d %d self %d %d %d %d" % (
-                #pad1x, pad1y, pad2x, pad2y, self.pad1x, self.pad1y, self.pad2x, self.pad2y)
-            #if abs(pad1x + pad2x) < STEP/4 or abs(pad1y + pad2y) < STEP/4:
-            #    self.win.mozRequestAnimationFrame(updateStatus)
-            #    return
-            self.clientX = (self.clientX + pad1x // DEAD + pad2x // DEAD) % HEIGHT
-            self.clientY = (self.clientY + pad1y // DEAD + pad2y // DEAD) % HEIGHT
+            self.clientX = (self.clientX + int(pad1x * DEAD) + int(pad2x * DEAD)) % HEIGHT
+            self.clientY = (self.clientY + int(pad1y * DEAD) + int(pad2y * DEAD)) % HEIGHT
             self.move()
-            #self.cosmo.space.div.text = [self.gridx, self.gridy, ranges.index(defender_range)]
-            #print("Inicializa updateStatus", [self.gridx, self.gridy, defender_range] + ranges)
-            #self.win.mozRequestAnimationFrame(updateStatus)
         self.cosmo, self.win, self.defenders = cosmo, win, defenders
         self.go = lambda e=0: None
         self.move = choose
         self.action = action
-
-        self.wait = self.starttime = 100000000
-        button_mapper = {'0': {0: nop, 1: nop}, '1': {0: nop, 1: self.action}, '2': {0: nop, 1: release}}
+        button_mapper = {'0': nop, '1': self.action, '2': release}
         self.gamepad = {}
         self.clientX = self.clientY = 0
-        self.gamebutton = [button_mapper[mapping] for mapping in '11221100022000']
+
+        def mapper(mapping):
+            button = Gamepad.Button()
+            button.onbuttonclick(button_mapper[mapping])
+            return {0: button.doup, 1: button.dodown}
+        self.gamebutton = [mapper(mapping) for mapping in '11221100022000']
         self.defender = self.defenders[0]
         self.clientX = self.clientY = 0
         self.div = self.cosmo.vg.image(
